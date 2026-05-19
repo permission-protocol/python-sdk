@@ -82,17 +82,13 @@ class PermissionProtocolClient:
 
     def verify(self, *, receipt_id: str) -> Receipt:
         receipt = self.get_receipt(receipt_id)
-        verification_data: Dict[str, Any] = {}
-        try:
-            verification_data = self._request(
-                "POST",
-                "/api/v1/receipts/verify",
-                json={"receiptId": receipt_id, "failOnMissing": True},
-            )
-        except APIError:
-            verification_data = {}
+        verification_data = self._request(
+            "POST",
+            "/api/v1/receipts/verify",
+            json={"receiptId": receipt_id, "failOnMissing": True},
+        )
 
-        valid = bool(verification_data.get("valid", receipt.valid))
+        valid = bool(verification_data.get("valid", False))
         receipt_payload = verification_data.get("receipt")
         if receipt_payload:
             parsed = Receipt.from_dict(receipt_payload, default_url=receipt.url)
