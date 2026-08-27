@@ -3,7 +3,7 @@ from collections import deque
 from unittest.mock import patch
 
 from permission_protocol.client import PermissionProtocolClient
-from permission_protocol.exceptions import PermissionDenied, PermissionTimeout
+from permission_protocol.exceptions import APIError, PermissionDenied, PermissionTimeout
 from permission_protocol.models import Config, Receipt
 
 
@@ -102,6 +102,44 @@ class ClientTests(unittest.TestCase):
 
         receipt = self.client.verify(receipt_id="pp_r_4")
         self.assertTrue(receipt.valid)
+
+    def test_verify_fails_closed_when_verification_request_fails(self):
+        self.client.get_receipt = lambda receipt_id: Receipt(
+            id=receipt_id,
+            status="APPROVED",
+            action="deploy",
+            resource="svc",
+            actor="bot",
+            valid=True,
+        )
+
+        def fake_request(method, path, **kwargs):
+            raise APIError("verification service unavailable")
+
+        self.client._request = fake_request
+
+        with self.assertRaises(APIError):
+            self.client.verify(receipt_id="pp_r_5")
+
+    def test_verify_does_not_trust_fetched_receipt_valid_flag(self):
+        self.client.get_receipt = lambda receipt_id: Receipt(
+            id=receipt_id,
+            status="APPROVED",
+            action="deploy",
+            resource="svc",
+            actor="bot",
+            valid=True,
+        )
+
+        def fake_request(method, path, **kwargs):
+            self.assertEqual(method, "POST")
+            self.assertEqual(path, "/api/v1/receipts/verify")
+            return {}
+
+        self.client._request = fake_request
+
+        receipt = self.client.verify(receipt_id="pp_r_6")
+        self.assertFalse(receipt.valid)
 
 
 if __name__ == "__main__":
